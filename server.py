@@ -66,6 +66,10 @@ mcp = FastMCP(
     "Ombre Brain",
     host="0.0.0.0",
     port=8000,
+    # Secret URL path for remote/streamable-http hardening.
+    # Set OMBRE_MCP_PATH in the deploy env (e.g. Render) to a hard-to-guess value
+    # like "/mcp-<random>". Defaults to "/mcp" so local/stdio behavior is unchanged.
+    streamable_http_path=os.environ.get("OMBRE_MCP_PATH", "/mcp"),
 )
 
 
