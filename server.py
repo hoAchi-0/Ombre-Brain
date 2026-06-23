@@ -94,6 +94,39 @@ async def health_check(request):
 
 
 # =============================================================
+# /export endpoint: read-only bulk export of all memory buckets
+# 只读批量导出所有记忆桶，供本地 Obsidian 镜像查看 / 离线备份
+# Auth: reuse the existing secret (OMBRE_MCP_PATH minus leading slash) as token,
+#       so no new env var is needed.
+# 鉴权：复用已有的秘密路径作为 token（去掉开头斜杠），无需新增环境变量。
+# =============================================================
+@mcp.custom_route("/export", methods=["GET"])
+async def export_buckets(request):
+    from starlette.responses import JSONResponse, PlainTextResponse
+    expected = os.environ.get("OMBRE_MCP_PATH", "").lstrip("/")
+    token = request.query_params.get("token", "")
+    if not expected or token != expected:
+        return PlainTextResponse("forbidden", status_code=403)
+    base = config["buckets_dir"]
+    files = {}
+    try:
+        for root, _dirs, names in os.walk(base):
+            for n in names:
+                if not n.endswith(".md"):
+                    continue
+                full = os.path.join(root, n)
+                rel = os.path.relpath(full, base).replace(os.sep, "/")
+                try:
+                    with open(full, "r", encoding="utf-8") as f:
+                        files[rel] = f.read()
+                except Exception as e:
+                    logger.warning(f"export read failed / 导出读取失败 {rel}: {e}")
+        return JSONResponse({"count": len(files), "files": files})
+    except Exception as e:
+        return JSONResponse({"status": "error", "detail": str(e)}, status_code=500)
+
+
+# =============================================================
 # Internal helper: merge-or-create
 # 内部辅助：检查是否可合并，可以则合并，否则新建
 # Shared by hold and grow to avoid duplicate logic
